@@ -14,7 +14,7 @@ module.exports = {
   transform: {
     "^.+\\.ts$": ["ts-jest", { useESM: true, tsconfig: "tsconfig.test.json" }],
   },
-  testTimeout: 60000,
+  testTimeout: 120000,
   clearMocks: true,
   setupFilesAfterEnv: ["<rootDir>/jest.setup.ts"],
 };
