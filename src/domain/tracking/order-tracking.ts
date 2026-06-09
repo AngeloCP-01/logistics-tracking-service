@@ -57,6 +57,20 @@ export class OrderTracking {
     return true;
   }
 
+  authorize(userId: UserId, role: "customer" | "driver" | "admin"): boolean {
+    if (role === "admin") return true;
+    if (role === "customer") return (this.props.customerId as string) === (userId as string);
+    // role === "driver"
+    return this.props.driverId !== null && (this.props.driverId as string) === (userId as string);
+  }
+
+  /** §8 guard: only the assigned driver, only before completion, may emit location/pickup/complete. */
+  canEmitDriverSignal(userId: UserId): boolean {
+    if (this.props.driverId === null) return false;
+    if ((this.props.driverId as string) !== (userId as string)) return false;
+    return !isAtOrAfter(this.props.status, TrackingStatus.COMPLETED);
+  }
+
   toProps(): OrderTrackingProps { return { ...this.props }; }
 
   pullEvents(): DomainEvent[] {
