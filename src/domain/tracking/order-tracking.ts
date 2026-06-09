@@ -33,6 +33,11 @@ export class OrderTracking {
   get createdAt(): Date { return this.props.createdAt; }
   get updatedAt(): Date { return this.props.updatedAt; }
 
+  assignDriver(driverId: DriverId, now: Date): void {
+    this.props.driverId = driverId;
+    this.props.updatedAt = now;
+  }
+
   toProps(): OrderTrackingProps { return { ...this.props }; }
 
   pullEvents(): DomainEvent[] {
