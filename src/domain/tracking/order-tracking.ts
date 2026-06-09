@@ -27,6 +27,28 @@ export class OrderTracking {
     return new OrderTracking({ ...props });
   }
 
+  static readonly PLACEHOLDER_CUSTOMER = "00000000-0000-0000-0000-000000000000";
+
+  static fromDriverAssigned(orderId: OrderId, driverId: DriverId, now: Date): OrderTracking {
+    return new OrderTracking({
+      orderId,
+      customerId: OrderTracking.PLACEHOLDER_CUSTOMER as unknown as UserId,
+      driverId,
+      status: TrackingStatus.CREATED,
+      createdAt: now,
+      updatedAt: now,
+    });
+  }
+
+  hasPlaceholderCustomer(): boolean {
+    return (this.props.customerId as string) === OrderTracking.PLACEHOLDER_CUSTOMER;
+  }
+
+  setCustomerId(customerId: UserId, now: Date): void {
+    this.props.customerId = customerId;
+    this.props.updatedAt = now;
+  }
+
   get orderId(): OrderId { return this.props.orderId; }
   get customerId(): UserId { return this.props.customerId; }
   get driverId(): DriverId | null { return this.props.driverId; }

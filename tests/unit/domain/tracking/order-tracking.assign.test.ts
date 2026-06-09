@@ -22,3 +22,17 @@ describe("OrderTracking.assignDriver", () => {
     expect(t.driverId).toBe(D2);
   });
 });
+
+describe("OrderTracking placeholder reconciliation", () => {
+  it("fromDriverAssigned creates a placeholder-customer projection with the driver set", () => {
+    const t = OrderTracking.fromDriverAssigned(OID, D1, NOW);
+    expect(t.driverId).toBe(D1);
+    expect(t.hasPlaceholderCustomer()).toBe(true);
+  });
+  it("setCustomerId fills the placeholder", () => {
+    const t = OrderTracking.fromDriverAssigned(OID, D1, NOW);
+    t.setCustomerId(CID, LATER);
+    expect(t.customerId).toBe(CID);
+    expect(t.hasPlaceholderCustomer()).toBe(false);
+  });
+});

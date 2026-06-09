@@ -2,34 +2,32 @@ import type { OrderTrackingRepository } from "../../domain/tracking/order-tracki
 import type { ProcessedEventRepository } from "../ports/processed-event-repository.js";
 import type { Clock } from "../ports/clock.js";
 import { OrderTracking } from "../../domain/tracking/order-tracking.js";
-import { OrderId, UserId } from "../../domain/shared/ids.js";
+import { OrderId, DriverId } from "../../domain/shared/ids.js";
 
-export interface OrderCreatedInput {
+export interface DriverAssignedInput {
   eventId: string;
   orderId: string;
-  customerId: string;
+  driverId: string;
 }
 
-export class HandleOrderCreatedUseCase {
+export class HandleDriverAssignedUseCase {
   constructor(
     private readonly tracking: OrderTrackingRepository,
     private readonly processed: ProcessedEventRepository,
     private readonly clock: Clock,
   ) {}
 
-  async execute(input: OrderCreatedInput, _correlationId: string): Promise<void> {
-    const isNew = await this.processed.recordIfNew(input.eventId, "order.created");
+  async execute(input: DriverAssignedInput, _correlationId: string): Promise<void> {
+    const isNew = await this.processed.recordIfNew(input.eventId, "dispatch.driver.assigned");
     if (!isNew) return;
     const orderId = OrderId.of(input.orderId);
-    const customerId = UserId.of(input.customerId);
+    const driverId = DriverId.of(input.driverId);
     const existing = await this.tracking.byId(orderId);
     if (existing) {
-      if (existing.hasPlaceholderCustomer()) {
-        existing.setCustomerId(customerId, this.clock.now());
-        await this.tracking.save(existing);
-      }
+      existing.assignDriver(driverId, this.clock.now());
+      await this.tracking.save(existing);
       return;
     }
-    await this.tracking.save(OrderTracking.fromOrderCreated(orderId, customerId, this.clock.now()));
+    await this.tracking.save(OrderTracking.fromDriverAssigned(orderId, driverId, this.clock.now()));
   }
 }

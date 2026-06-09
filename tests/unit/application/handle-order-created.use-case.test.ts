@@ -1,6 +1,6 @@
 import { HandleOrderCreatedUseCase } from "@/application/tracking/handle-order-created.use-case.js";
 import { FakeOrderTrackingRepo, FakeProcessedEvents, FixedClock } from "./_fakes.js";
-import { OrderId, UserId } from "@/domain/shared/ids.js";
+import { OrderId } from "@/domain/shared/ids.js";
 import { TrackingStatus } from "@/domain/tracking/tracking-status.js";
 
 const NOW = new Date("2026-06-09T10:00:00.000Z");
@@ -32,20 +32,20 @@ describe("HandleOrderCreatedUseCase", () => {
     expect(await repo.byId(OrderId.of(OID))).toBe(first);   // same instance, not overwritten
   });
 
-  it("does not clobber an existing driverId when order.created arrives after driver.assigned (out-of-order)", async () => {
+  it("reconciles the real customerId onto a placeholder when order.created arrives after driver.assigned (out-of-order)", async () => {
     const { repo, uc } = build();
-    // Simulate an assigned-before-created projection already present:
+    // Simulate an assigned-before-created placeholder projection already present:
     const { OrderTracking } = await import("@/domain/tracking/order-tracking.js");
     const { DriverId } = await import("@/domain/shared/ids.js");
-    const existing = OrderTracking.fromPersistence({
-      orderId: OrderId.of(OID), customerId: UserId.of(CID),
-      driverId: DriverId.of("018f4e1a-0bbb-7c3d-8e4f-5a6b7c8d9e0f"),
-      status: TrackingStatus.CREATED, createdAt: NOW, updatedAt: NOW,
-    });
+    const existing = OrderTracking.fromDriverAssigned(
+      OrderId.of(OID),
+      DriverId.of("018f4e1a-0bbb-7c3d-8e4f-5a6b7c8d9e0f"),
+      NOW,
+    );
     await repo.save(existing);
     await uc.execute({ eventId: "e1", orderId: OID, customerId: CID }, "corr");
     const t = await repo.byId(OrderId.of(OID));
     expect(t!.driverId).not.toBeNull();                    // driverId preserved
-    expect(t!.customerId).toBe(CID);
+    expect(t!.customerId).toBe(CID);                       // placeholder reconciled to the real customerId
   });
 });
