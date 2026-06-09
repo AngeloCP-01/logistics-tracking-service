@@ -1,6 +1,6 @@
 import type { OrderId, DriverId, UserId } from "../shared/ids.js";
 import { TrackingStatus, isAtOrAfter } from "./tracking-status.js";
-import { DeliveryInTransit } from "../events/index.js";
+import { DeliveryInTransit, DeliveryCompleted } from "../events/index.js";
 import type { DomainEvent } from "../events/index.js";
 
 export interface OrderTrackingProps {
@@ -45,6 +45,15 @@ export class OrderTracking {
     this.props.status = TrackingStatus.IN_TRANSIT;
     this.props.updatedAt = now;
     this.events.push(new DeliveryInTransit(this.props.orderId, now));
+    return true;
+  }
+
+  /** Idempotent: returns true and records DeliveryCompleted only when this advances to completed. */
+  completeDelivery(now: Date): boolean {
+    if (isAtOrAfter(this.props.status, TrackingStatus.COMPLETED)) return false;
+    this.props.status = TrackingStatus.COMPLETED;
+    this.props.updatedAt = now;
+    this.events.push(new DeliveryCompleted(this.props.orderId, now));
     return true;
   }
 
