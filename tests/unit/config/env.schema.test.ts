@@ -17,7 +17,8 @@ describe("envSchema", () => {
   });
 
   it("defaults TTL days to 30 when omitted", () => {
-    const { TRACKING_LOCATION_TTL_DAYS: _omit, ...rest } = base;
+    const rest = { ...base } as Partial<typeof base>;
+    delete rest.TRACKING_LOCATION_TTL_DAYS;
     expect(envSchema.parse(rest).TRACKING_LOCATION_TTL_DAYS).toBe(30);
   });
 
