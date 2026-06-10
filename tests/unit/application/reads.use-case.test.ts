@@ -4,7 +4,7 @@ import { FakeOrderTrackingRepo, FakeLocationRepo } from "./_fakes.js";
 import { OrderTracking } from "@/domain/tracking/order-tracking.js";
 import { Coordinates } from "@/domain/shared/coordinates.js";
 import { OrderId, DriverId, UserId } from "@/domain/shared/ids.js";
-import { ForbiddenError, OrderTrackingNotFoundError } from "@/domain/shared/errors.js";
+import { OrderTrackingNotFoundError } from "@/domain/shared/errors.js";
 
 const NOW = new Date("2026-06-09T10:00:00.000Z");
 const OID = OrderId.of("018f4e1a-1c2b-7c3d-8e4f-5a6b7c8d9e0f");
@@ -27,10 +27,10 @@ describe("GetLatestUseCase", () => {
     const out = await uc.execute(OID, CID as unknown as string, "customer");
     expect(out).toEqual({ orderId: OID, lat: 14.5, lng: 121.0, ts: NOW });
   });
-  it("403s a stranger", async () => {
+  it("404s a stranger (hides existence — same as an unknown order)", async () => {
     const { tracking, locations } = await seed();
     const uc = new GetLatestUseCase(tracking, locations);
-    await expect(uc.execute(OID, "018f4e1a-0999-7c3d-8e4f-5a6b7c8d9e0f", "customer")).rejects.toBeInstanceOf(ForbiddenError);
+    await expect(uc.execute(OID, "018f4e1a-0999-7c3d-8e4f-5a6b7c8d9e0f", "customer")).rejects.toBeInstanceOf(OrderTrackingNotFoundError);
   });
   it("404s when no projection", async () => {
     const tracking = new FakeOrderTrackingRepo(); const locations = new FakeLocationRepo();

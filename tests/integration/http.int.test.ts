@@ -66,11 +66,11 @@ describe("HTTP read authz", () => {
       expect(res.status).toBe(200);
     });
 
-    it("returns 403 for a stranger customer", async () => {
+    it("returns 404 for a stranger customer (hides existence — same as an unknown order)", async () => {
       await projectAssignedOrder();
       await seedPoints();
       const res = await request(fx.baseUrl).get(`/tracking/orders/${OID}/latest`).set("Authorization", bearer(STRANGER, "customer"));
-      expect(res.status).toBe(403);
+      expect(res.status).toBe(404);
     });
 
     it("returns 404 for an unknown order", async () => {
@@ -96,11 +96,11 @@ describe("HTTP read authz", () => {
       expect(res.body.nextCursor).not.toBeNull();
     });
 
-    it("returns 403 for a stranger", async () => {
+    it("returns 404 for a stranger (hides existence — same as an unknown order)", async () => {
       await projectAssignedOrder();
       await seedPoints();
       const res = await request(fx.baseUrl).get(`/tracking/orders/${OID}/route`).set("Authorization", bearer(STRANGER, "customer"));
-      expect(res.status).toBe(403);
+      expect(res.status).toBe(404);
     });
   });
 
