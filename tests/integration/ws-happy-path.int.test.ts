@@ -15,8 +15,15 @@ afterEach(async () => { await collector.stop(); });
 
 describe("WS happy path", () => {
   it("projects the order, broadcasts a location to the customer, and publishes the lifecycle", async () => {
-    // 1. Drive the projection.
+    // 1. Drive the projection. Serialize the two publishes (wait for order.created
+    // to land before assigning) so they don't race on the upsert — the consumer's
+    // prefetch allows concurrent processing, and a back-to-back publish can let
+    // driver.assigned clobber the real customer with the placeholder.
     await fx.publishEvent("order.created", orderCreated(OID, CID));
+    await waitFor(async () => {
+      const doc = await fx.db.collection("tracking_orders").findOne({ orderId: OID });
+      return !!doc && doc.customerId === CID;
+    }, 5000);
     await fx.publishEvent("dispatch.driver.assigned", driverAssigned(OID, DID));
     await waitFor(async () => {
       const doc = await fx.db.collection("tracking_orders").findOne({ orderId: OID });

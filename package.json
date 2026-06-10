@@ -12,7 +12,7 @@
     "lint": "eslint .",
     "format": "prettier --write .",
     "test": "NODE_OPTIONS='--experimental-vm-modules' jest --config jest.unit.config.cjs",
-    "test:int": "NODE_OPTIONS='--experimental-vm-modules' jest --config jest.integration.config.cjs --runInBand"
+    "test:int": "NODE_OPTIONS='--experimental-vm-modules' jest --config jest.integration.config.cjs --runInBand --forceExit"
   },
   "dependencies": {
     "@angelocp-01/logistics-contracts": "^0.6.0",

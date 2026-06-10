@@ -46,6 +46,11 @@ import { createApp } from "../../../src/app.js";
 const USER_SECRET = "u".repeat(40);
 const TTL_DAYS = 30;
 
+/** Bounds a teardown close so a dead dependency (stopped container) can't hang `stop()`. */
+function withTimeout<T>(p: Promise<T>, ms: number): Promise<T | void> {
+  return Promise.race([p, new Promise<void>((resolve) => setTimeout(resolve, ms).unref())]);
+}
+
 export interface TrackingFixture {
   mongo: MongoFixture;
   rabbit: RabbitFixture;
@@ -57,6 +62,7 @@ export interface TrackingFixture {
   rabbitUrl: string;
   stop: () => Promise<void>;
   setShuttingDown: () => void;
+  closeChannel: () => Promise<void>;
   signUserJwt: (userId: string, role: "customer" | "driver" | "admin") => string;
   publishEvent: (routingKey: string, envelope: unknown) => Promise<void>;
   resetAll: () => Promise<void>;
@@ -74,11 +80,22 @@ export async function bootstrap(opts?: { startConsumer?: boolean }): Promise<Tra
   await bootstrapMongo(db, TTL_DAYS);
 
   // App health-Redis (fail-fast ping) + the two Socket.IO adapter clients.
+  // Attach 'error' handlers so that when a readyz dependency-down probe stops the
+  // Redis container, the clients' retry-exhaustion errors are tolerated rather than
+  // crashing the test process as unhandled 'error' events.
   const redis = createRedisClient(redisFx.url);
+  redis.on("error", () => { /* tolerated in tests */ });
   await redis.connect();
   await redis.ping();
-  const pub = createRedisClient(redisFx.url);
+  // The Socket.IO adapter clients use maxRetriesPerRequest: null so that when a
+  // readyz dependency-down probe stops the Redis container, the adapter's in-flight
+  // commands queue (and never settle) instead of rejecting with an unhandled
+  // MaxRetriesPerRequestError that would crash the test run. (The health-Redis above
+  // keeps maxRetriesPerRequest: 1 so its ping fails fast — that's what readyz tests.)
+  const pub = createRedisClient(redisFx.url, { maxRetriesPerRequest: null });
   const sub = pub.duplicate();
+  pub.on("error", () => { /* tolerated in tests */ });
+  sub.on("error", () => { /* tolerated in tests */ });
   await Promise.all([pub.connect(), sub.connect()]);
 
   const { connection: amqpConn, channel: amqpCh } = await connect(rabbit.url);
@@ -152,20 +169,33 @@ export async function bootstrap(opts?: { startConsumer?: boolean }): Promise<Tra
     stop: async () => {
       shuttingDown = true;
       try { if (consumer) await consumer.stop(); } catch { /* ignore */ }
-      try { await socket.close(); } catch { /* ignore */ }
+      // Close the Socket.IO server FIRST, while the adapter's Redis clients are still
+      // connected, so it can cleanly unsubscribe. withTimeout bounds it for the readyz
+      // case where Redis is already dead (the unsubscribe then throws "Connection is
+      // closed" synchronously — caught here — rather than hanging).
+      try { await withTimeout(socket.close(), 5000); } catch { /* ignore */ }
       await new Promise<void>((resolve) => server.close(() => resolve()));
-      try { await pubChannel.close(); } catch { /* ignore */ }
-      try { await amqpCh.close(); } catch { /* ignore */ }
-      try { await amqpConn.close(); } catch { /* ignore */ }
-      try { await redis.quit(); } catch { /* ignore */ }
-      try { await pub.quit(); } catch { /* ignore */ }
-      try { await sub.quit(); } catch { /* ignore */ }
-      try { await mongoClient.close(); } catch { /* ignore */ }
+      // disconnect() (not quit()) so teardown can't hang on a dead Redis — the readyz
+      // dependency-down probes may have stopped the container, and quit() would block
+      // forever on the queued/un-settleable command.
+      try { redis.disconnect(); } catch { /* ignore */ }
+      try { pub.disconnect(); } catch { /* ignore */ }
+      try { sub.disconnect(); } catch { /* ignore */ }
+      try { await withTimeout(pubChannel.close(), 5000); } catch { /* ignore */ }
+      try { await withTimeout(amqpCh.close(), 5000); } catch { /* ignore */ }
+      try { await withTimeout(amqpConn.close(), 5000); } catch { /* ignore */ }
+      try { await withTimeout(mongoClient.close(), 5000); } catch { /* ignore */ }
       try { await redisFx.stop(); } catch { /* ignore */ }
       try { await stopRabbit(rabbit); } catch { /* ignore */ }
       try { await stopMongo(mongo); } catch { /* ignore */ }
     },
     setShuttingDown: () => { shuttingDown = true; },
+    closeChannel: async () => {
+      // Closing the work channel flips activeChannel → null via its "close" handler,
+      // so readyz reports broker_unavailable. The consumer's channel is the same one.
+      activeChannel = null;
+      try { await amqpCh.close(); } catch { /* ignore */ }
+    },
     signUserJwt: (userId, role) => sign({ role }, USER_SECRET, { algorithm: "HS256", subject: userId, expiresIn: "5m" }),
     publishEvent: async (routingKey, envelope) => {
       pubChannel.publish(LOGISTICS_EXCHANGE, routingKey, Buffer.from(JSON.stringify(envelope)), {

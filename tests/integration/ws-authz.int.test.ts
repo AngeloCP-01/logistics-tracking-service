@@ -41,7 +41,8 @@ function expectError(s: TestSocket, code: string): Promise<void> {
     const timer = setTimeout(() => reject(new Error(`expected error ${code}, none received`)), 1000);
     s.socket.once("error", (e: { code: string }) => {
       clearTimeout(timer);
-      e.code === code ? resolve() : reject(new Error(`got ${e.code}`));
+      if (e.code === code) resolve();
+      else reject(new Error(`got ${e.code}`));
     });
   });
 }
