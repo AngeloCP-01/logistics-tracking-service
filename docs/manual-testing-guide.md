@@ -235,7 +235,7 @@ Run the "Negative-path probes" block in `tracking-service.http`. Expected:
 |---|---|
 | REST read, no `Authorization` header | **401** |
 | REST read, bogus JWT | **401** |
-| REST read of another customer's order (sub != customerId) | **403** |
+| REST read of another customer's order (sub != customerId) | **404** (existence hidden — same as an unknown order) |
 | REST read of a nonexistent / not-yet-tracked order (admin) | **404** |
 | WS `room:join` for an order you don't own (and aren't the driver/admin of) | `error { code: "forbidden" }` |
 | WS `location:update` / `delivery:pickup` / `delivery:complete` from a non-assigned driver | `error { code: "forbidden" }`, **state unchanged** |

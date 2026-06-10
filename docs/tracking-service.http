@@ -85,7 +85,7 @@ GET {{baseUrl}}/tracking/orders/{{orderId}}/latest
 GET {{baseUrl}}/tracking/orders/{{orderId}}/latest
 Authorization: Bearer not.a.real.jwt
 
-### Read another customer's order (sub != the order's customerId, role customer) — expect 403 forbidden
+### Read another customer's order (sub != the order's customerId, role customer) — expect 404 (existence hidden; same as an unknown order)
 GET {{baseUrl}}/tracking/orders/{{orderId}}/latest
 Authorization: Bearer <paste a DIFFERENT customer's JWT>
 
