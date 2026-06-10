@@ -1,0 +1,94 @@
+### tracking-service local exercise file
+# REST Client (VS Code) — runs the two REST read endpoints of the service.
+# Boot the server first: `npm run dev` (loads .env via tsx --env-file).
+#
+# NOTE on paths: hitting tracking-service DIRECTLY (this file) uses NO `/v1`
+# prefix — the service mounts the reads at `/tracking`. In production the
+# gateway adds `/v1` and strips it before forwarding (so clients call
+# `/v1/tracking/...`). The WebSocket (`/socket.io/`) is exercised separately —
+# see docs/manual-testing-guide.md + the simulate-driver.ts script; a REST
+# Client file can't drive a Socket.IO connection.
+#
+# ─────────────────────────────────────────────────────────────────────────
+# THE BIG PICTURE: there is NO HTTP endpoint that starts tracking. An order
+# becomes trackable when the service CONSUMES `order.created` (→ customerId)
+# and `dispatch.driver.assigned` (→ driverId) into the `tracking_orders`
+# projection, and points appear only once a driver streams `location:update`
+# over the WebSocket. So to get a non-empty /latest or /route you FIRST drive
+# the projection + a point in (see the manual-testing-guide), THEN read here.
+#
+# PREREQUISITES:
+#
+#   1. Mongo + Redis + RabbitMQ. `docker compose up -d` brings up the dev
+#      Mongo (:27018) + Redis (:6380). RabbitMQ must be reachable at
+#      RABBITMQ_URL — the platform `logistics-rabbitmq` (dev/dev creds) is
+#      likely already running (`docker ps`); set
+#      RABBITMQ_URL=amqp://dev:dev@localhost:5672.
+#
+#   2. User JWTs signed with JWT_SECRET. tracking VERIFIES the inbound token
+#      with JWT_SECRET (= auth-service's AUTH_JWT_SECRET); it does NOT mint
+#      tokens. It needs `sub` + `role` (HS256). Only the owning customer, the
+#      assigned driver, or an admin may read. Self-mint:
+#        # a CUSTOMER token — sub MUST equal the order's customerId
+#        node -e 'const jwt=require("jsonwebtoken"); console.log(jwt.sign({sub:"47913fd3-7bf9-4182-9d94-6144ddb74cfe", role:"customer"}, process.env.JWT_SECRET, {algorithm:"HS256", expiresIn:"30m"}))'
+#        # an ADMIN token
+#        node -e 'const jwt=require("jsonwebtoken"); console.log(jwt.sign({sub:"05950000-0000-7000-8000-00000000adm1", role:"admin"}, process.env.JWT_SECRET, {algorithm:"HS256", expiresIn:"30m"}))'
+#      Run from this repo so jsonwebtoken + JWT_SECRET resolve, e.g.
+#        export $(grep -v '^#' .env | xargs) && node -e '...'
+#
+# Usage:
+#   1. Drive the projection + at least one point in (manual-testing-guide §4–§5).
+#   2. Paste a customer/admin JWT into @token and set @orderId.
+#   3. Click "Send Request".
+
+@baseUrl = http://localhost:3005
+@orderId = 06950000-0000-7000-8000-00000000a001
+
+# Paste a valid user JWT — the owning customer (sub = the order's customerId),
+# the assigned driver (sub = the driverId), or an admin (see prereq #2).
+@token = <paste a CUSTOMER/ADMIN JWT>
+
+
+############################################################
+# Health
+############################################################
+
+### healthz — liveness (always 200)
+GET {{baseUrl}}/healthz
+
+### readyz — readiness (200 when Mongo + RabbitMQ channel + Redis are healthy)
+GET {{baseUrl}}/readyz
+
+
+############################################################
+# REST reads (owning customer / assigned driver / admin only)
+############################################################
+
+### Latest known point for the order → 200 { orderId, lat, lng, ts } (404 if no point yet)
+# (Direct = no /v1; via the gateway this is GET /v1/tracking/orders/{id}/latest.)
+GET {{baseUrl}}/tracking/orders/{{orderId}}/latest
+Authorization: Bearer {{token}}
+
+### Full ordered route for the order → 200 { orderId, points: [{ lat, lng, ts }, ...] }
+GET {{baseUrl}}/tracking/orders/{{orderId}}/route
+Authorization: Bearer {{token}}
+
+
+############################################################
+# Negative-path probes (intentionally fail; for spot-checking error shapes)
+############################################################
+
+### No auth — expect 401 unauthorized
+GET {{baseUrl}}/tracking/orders/{{orderId}}/latest
+
+### Bogus JWT — expect 401 unauthorized
+GET {{baseUrl}}/tracking/orders/{{orderId}}/latest
+Authorization: Bearer not.a.real.jwt
+
+### Read another customer's order (sub != the order's customerId, role customer) — expect 403 forbidden
+GET {{baseUrl}}/tracking/orders/{{orderId}}/latest
+Authorization: Bearer <paste a DIFFERENT customer's JWT>
+
+### Read a nonexistent / not-yet-tracked order (admin) — expect 404 not_found
+GET {{baseUrl}}/tracking/orders/06950000-0000-7000-8000-00000000ffff/latest
+Authorization: Bearer {{token}}
