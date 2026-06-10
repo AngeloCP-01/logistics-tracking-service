@@ -15,7 +15,9 @@ export interface SocketServerHandle {
  */
 export function createSocketServer(httpServer: HttpServer, pub: RedisClient, sub: RedisClient): SocketServerHandle {
   const io = new IoServer(httpServer, {
-    // Default path "/socket.io/" — the gateway proxies /v1/tracking/socket.io/ to this upstream.
+    // The gateway WS proxy forwards /v1/tracking/socket.io/ pass-through (no strip),
+    // so the server path must match it exactly.
+    path: "/v1/tracking/socket.io/",
     serveClient: false,
     cors: { origin: false },
   });

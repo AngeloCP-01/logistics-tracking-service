@@ -47,11 +47,11 @@ const bearer = (userId: string, role: "customer" | "driver" | "admin"): string =
   `Bearer ${fx.signUserJwt(userId, role)}`;
 
 describe("HTTP read authz", () => {
-  describe("GET /tracking/orders/:orderId/latest", () => {
+  describe("GET /v1/tracking/orders/:orderId/latest", () => {
     it("returns 200 for the owning customer", async () => {
       await projectAssignedOrder();
       await seedPoints();
-      const res = await request(fx.baseUrl).get(`/tracking/orders/${OID}/latest`).set("Authorization", bearer(CID, "customer"));
+      const res = await request(fx.baseUrl).get(`/v1/tracking/orders/${OID}/latest`).set("Authorization", bearer(CID, "customer"));
       expect(res.status).toBe(200);
       expect(res.body.orderId).toBe(OID);
       expect(res.body.lat).toBeCloseTo(14.52);
@@ -62,34 +62,34 @@ describe("HTTP read authz", () => {
     it("returns 200 for an admin", async () => {
       await projectAssignedOrder();
       await seedPoints();
-      const res = await request(fx.baseUrl).get(`/tracking/orders/${OID}/latest`).set("Authorization", bearer(ADMIN, "admin"));
+      const res = await request(fx.baseUrl).get(`/v1/tracking/orders/${OID}/latest`).set("Authorization", bearer(ADMIN, "admin"));
       expect(res.status).toBe(200);
     });
 
     it("returns 404 for a stranger customer (hides existence — same as an unknown order)", async () => {
       await projectAssignedOrder();
       await seedPoints();
-      const res = await request(fx.baseUrl).get(`/tracking/orders/${OID}/latest`).set("Authorization", bearer(STRANGER, "customer"));
+      const res = await request(fx.baseUrl).get(`/v1/tracking/orders/${OID}/latest`).set("Authorization", bearer(STRANGER, "customer"));
       expect(res.status).toBe(404);
     });
 
     it("returns 404 for an unknown order", async () => {
-      const res = await request(fx.baseUrl).get(`/tracking/orders/${UNKNOWN}/latest`).set("Authorization", bearer(ADMIN, "admin"));
+      const res = await request(fx.baseUrl).get(`/v1/tracking/orders/${UNKNOWN}/latest`).set("Authorization", bearer(ADMIN, "admin"));
       expect(res.status).toBe(404);
     });
 
     it("returns 404 for a known order with no points", async () => {
       await projectAssignedOrder();
-      const res = await request(fx.baseUrl).get(`/tracking/orders/${OID}/latest`).set("Authorization", bearer(CID, "customer"));
+      const res = await request(fx.baseUrl).get(`/v1/tracking/orders/${OID}/latest`).set("Authorization", bearer(CID, "customer"));
       expect(res.status).toBe(404);
     });
   });
 
-  describe("GET /tracking/orders/:orderId/route", () => {
+  describe("GET /v1/tracking/orders/:orderId/route", () => {
     it("returns 200 with oldest-first items + nextCursor for the assigned driver", async () => {
       await projectAssignedOrder();
       await seedPoints();
-      const res = await request(fx.baseUrl).get(`/tracking/orders/${OID}/route?limit=2`).set("Authorization", bearer(D1, "driver"));
+      const res = await request(fx.baseUrl).get(`/v1/tracking/orders/${OID}/route?limit=2`).set("Authorization", bearer(D1, "driver"));
       expect(res.status).toBe(200);
       expect(res.body.items).toHaveLength(2);
       expect(new Date(res.body.items[0].ts).getTime()).toBeLessThan(new Date(res.body.items[1].ts).getTime());
@@ -99,19 +99,19 @@ describe("HTTP read authz", () => {
     it("returns 404 for a stranger (hides existence — same as an unknown order)", async () => {
       await projectAssignedOrder();
       await seedPoints();
-      const res = await request(fx.baseUrl).get(`/tracking/orders/${OID}/route`).set("Authorization", bearer(STRANGER, "customer"));
+      const res = await request(fx.baseUrl).get(`/v1/tracking/orders/${OID}/route`).set("Authorization", bearer(STRANGER, "customer"));
       expect(res.status).toBe(404);
     });
   });
 
   describe("authentication", () => {
     it("returns 401 with no bearer token", async () => {
-      const res = await request(fx.baseUrl).get(`/tracking/orders/${OID}/latest`);
+      const res = await request(fx.baseUrl).get(`/v1/tracking/orders/${OID}/latest`);
       expect(res.status).toBe(401);
     });
 
     it("returns 401 with an invalid bearer token", async () => {
-      const res = await request(fx.baseUrl).get(`/tracking/orders/${OID}/latest`).set("Authorization", "Bearer garbage");
+      const res = await request(fx.baseUrl).get(`/v1/tracking/orders/${OID}/latest`).set("Authorization", "Bearer garbage");
       expect(res.status).toBe(401);
     });
   });
