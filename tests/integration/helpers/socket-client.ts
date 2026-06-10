@@ -10,7 +10,14 @@ export interface TestSocket {
 }
 
 export function connectSocket(baseUrl: string, token: string): Promise<TestSocket> {
-  const socket = io(baseUrl, { auth: { token }, reconnection: false, transports: ["websocket"], forceNew: true });
+  const socket = io(baseUrl, {
+    // Match the server's socket.io path (the gateway forwards /v1/tracking/socket.io/ pass-through).
+    path: "/v1/tracking/socket.io/",
+    auth: { token },
+    reconnection: false,
+    transports: ["websocket"],
+    forceNew: true,
+  });
   const once = <T = unknown>(event: string): Promise<T> =>
     new Promise<T>((resolve) => socket.once(event, (data: T) => resolve(data)));
 

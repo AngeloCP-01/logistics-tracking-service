@@ -35,7 +35,7 @@ export function createApp(deps: AppDeps): Express {
   app.get("/readyz", deps.health.readyz);
 
   app.use(userAuth(deps.userJwt));
-  app.use(trackingRoutes(deps.controller));
+  app.use("/v1", trackingRoutes(deps.controller));
 
   app.use(errorMapper());
   return app;
