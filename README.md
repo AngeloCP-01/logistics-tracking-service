@@ -10,8 +10,8 @@ See the design spec: [`../docs/superpowers/specs/2026-06-09-tracking-service-des
 
 - **WebSocket** (gateway-proxied): `wss://api.<domain>/v1/tracking/socket.io/` — Socket.IO v4, handshake JWT in `auth.token`. Client→server: `room:join`, `location:update`, `delivery:pickup`, `delivery:complete`. Server→client: `driver:location`, `delivery:in_transit`, `delivery:completed`, `error`. Full protocol in the WS doc above.
 - **REST reads** (owning customer / assigned driver / admin only):
-  - `GET /tracking/orders/{id}/latest` — the last-known point.
-  - `GET /tracking/orders/{id}/route` — the full ordered path.
+  - `GET /v1/tracking/orders/{id}/latest` — the last-known point.
+  - `GET /v1/tracking/orders/{id}/route` — the full ordered path.
 - `GET /healthz` · `GET /readyz` (Mongo + RabbitMQ + Redis).
 
 Errors are RFC 7807 Problem Details. There is **no HTTP endpoint to start tracking** — an order becomes trackable when the service consumes `order.created` + `dispatch.driver.assigned`.

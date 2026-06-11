@@ -18,7 +18,7 @@ In V1 the only driver client is the **simulation script** (`logistics-infrastruc
 3. **Persist every point** to a Mongo **time-series** collection (`driver_locations`) with a `2dsphere` index on `point` and a TTL (`TRACKING_LOCATION_TTL_DAYS`, default 30d). **CONFIRMED on mongo 7: a `2dsphere` index on a time-series collection works** — verified in the H2 integration test against the real container. (This was an open question in the old scaffold; it is now settled.)
 4. **Event-sourced authz projection — no sync calls.** Consume `order.created` (→ `customerId`) and `dispatch.driver.assigned` (→ `driverId`) into the `tracking_orders` projection; authorize room joins + driver signals from that local state. **NO synchronous service-to-service calls; NO `SERVICE_JWT_SECRET`.**
 5. **Socket.IO Redis-adapter fan-out** (persist-then-emit). Two ioredis clients drive the adapter: a pub client + a duplicated sub client. Persist the point first, then broadcast.
-6. **On-join snapshot + REST reads.** On `room:join` the last-known point (if any) is emitted to that socket; `GET /tracking/orders/{id}/route` returns the full path, `GET /tracking/orders/{id}/latest` the last point.
+6. **On-join snapshot + REST reads.** On `room:join` the last-known point (if any) is emitted to that socket; `GET /v1/tracking/orders/{id}/route` returns the full path, `GET /v1/tracking/orders/{id}/latest` the last point.
 7. **Simple disconnect.** A WS drop does **not** change status (auto-reconnect resumes). The §8 guards reject untrusted signals (non-assigned driver / unknown order / already-completed). There is **no lost-driver detection** and no heartbeat in V1.
 8. **Native `mongodb` driver, NOT Prisma.** There is no Prisma, no Postgres in this service.
 
@@ -27,10 +27,10 @@ In V1 the only driver client is the **simulation script** (`logistics-infrastruc
 - **Consumed:** `order.created` (→ `customerId`), `dispatch.driver.assigned` (→ `driverId`). Both feed the `tracking_orders` projection.
 - **Produced:** `delivery.in_transit` `{ orderId }` (on pickup), `delivery.completed` `{ orderId }` (on completion). Tracking is the **real producer** of these — dispatch/order consume `delivery.completed` to free the driver / close the order.
 
-### Public surface (via the gateway, which adds the `/v1` prefix)
+### Public surface (mounted under `/v1/tracking`; the gateway forwards `/v1` pass-through)
 
 - **WebSocket:** `wss://api.<domain>/v1/tracking/socket.io/` — Socket.IO v4, handshake JWT in `auth.token`. Protocol is documented in [`../logistics-contracts/docs/tracking-ws.md`](../logistics-contracts/docs/tracking-ws.md) (client→server `room:join` / `location:update` / `delivery:pickup` / `delivery:complete`; server→client `driver:location` / `delivery:in_transit` / `delivery:completed` / `error`).
-- **REST:** `GET /tracking/orders/{id}/latest`, `GET /tracking/orders/{id}/route` — owning customer / assigned driver / admin only.
+- **REST:** `GET /v1/tracking/orders/{id}/latest`, `GET /v1/tracking/orders/{id}/route` — owning customer / assigned driver / admin only.
 - `GET /healthz` (liveness) + `GET /readyz` (Mongo ping + RabbitMQ channel + Redis ping).
 
 ## Architecture

@@ -181,7 +181,7 @@ While the simulation runs, run a minimal **customer** Socket.IO client to watch 
 // /tmp/watch.mjs — run: node /tmp/watch.mjs <CUSTOMER_OR_ADMIN_JWT> <orderId>
 import { io } from "socket.io-client";
 const [token, orderId] = process.argv.slice(2);
-const socket = io("ws://localhost:3005", { auth: { token } });
+const socket = io("ws://localhost:3005", { path: "/v1/tracking/socket.io/", auth: { token } });
 socket.on("connect", () => { console.log("connected"); socket.emit("room:join", { orderId }); });
 socket.on("driver:location", (p) => console.log("driver:location", p));
 socket.on("delivery:in_transit", (p) => console.log("delivery:in_transit", p));
@@ -212,18 +212,18 @@ Using [`tracking-service.http`](tracking-service.http) (click "Send Request") or
 
 | Action | Expect |
 |---|---|
-| `GET /tracking/orders/{orderId}/latest` | **200** `{ orderId, lat, lng, ts }` — the last streamed point (404 if none yet) |
-| `GET /tracking/orders/{orderId}/route` | **200** `{ orderId, points: [{ lat, lng, ts }, …] }` — the full ordered path |
+| `GET /v1/tracking/orders/{orderId}/latest` | **200** `{ orderId, lat, lng, ts }` — the last streamed point (404 if none yet) |
+| `GET /v1/tracking/orders/{orderId}/route` | **200** `{ orderId, points: [{ lat, lng, ts }, …] }` — the full ordered path |
 
 ```bash
 TOKEN="<paste CUSTOMER or ADMIN JWT>"
-curl -s localhost:3005/tracking/orders/06950000-0000-7000-8000-00000000a001/latest \
+curl -s localhost:3005/v1/tracking/orders/06950000-0000-7000-8000-00000000a001/latest \
   -H "authorization: Bearer $TOKEN"
-curl -s localhost:3005/tracking/orders/06950000-0000-7000-8000-00000000a001/route \
+curl -s localhost:3005/v1/tracking/orders/06950000-0000-7000-8000-00000000a001/route \
   -H "authorization: Bearer $TOKEN"
 ```
 
-> **No `/v1`** when hitting tracking directly. The gateway adds `/v1` in production (`/v1/tracking/orders/...`).
+> The service mounts these reads under `/v1/tracking`, so **both** a direct hit (`:3005/v1/tracking/orders/...`) and a gateway call (`/v1/tracking/orders/...`) use the same path — the gateway forwards `/v1` pass-through (it does not add or strip it).
 
 ---
 
@@ -271,7 +271,7 @@ docker compose down                 # dev Mongo + Redis
 ---
 
 ### Notes / gotchas
-- **No `/v1`** when hitting tracking directly (`:3005/tracking/...`). The gateway adds `/v1` in production; the WS endpoint is `wss://api.<domain>/v1/tracking/socket.io/`.
+- **`/v1/tracking` whether direct or via the gateway.** The service mounts its routes under `/v1/tracking` (`:3005/v1/tracking/...`) and its Socket.IO server at `path: "/v1/tracking/socket.io/"`; the gateway forwards `/v1` pass-through (it does not add or strip it). The WS endpoint is `wss://api.<domain>/v1/tracking/socket.io/`.
 - **Tracking is event-sourced for authz.** No order is trackable until both `order.created` (customerId) and `dispatch.driver.assigned` (driverId) are consumed; there is no HTTP "start tracking".
 - **No coordinates drive the lifecycle.** `delivery:pickup` / `delivery:complete` are explicit signals — there is no geofencing.
 - **Tracking produces `delivery.in_transit` + `delivery.completed`.** To see them, bind a probe queue to `logistics.events` with those routing keys in the RabbitMQ UI — dispatch/order consume `delivery.completed` to free the driver / close the order.

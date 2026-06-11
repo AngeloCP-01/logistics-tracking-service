@@ -2,12 +2,13 @@
 # REST Client (VS Code) — runs the two REST read endpoints of the service.
 # Boot the server first: `npm run dev` (loads .env via tsx --env-file).
 #
-# NOTE on paths: hitting tracking-service DIRECTLY (this file) uses NO `/v1`
-# prefix — the service mounts the reads at `/tracking`. In production the
-# gateway adds `/v1` and strips it before forwarding (so clients call
-# `/v1/tracking/...`). The WebSocket (`/socket.io/`) is exercised separately —
-# see docs/manual-testing-guide.md + the simulate-driver.ts script; a REST
-# Client file can't drive a Socket.IO connection.
+# NOTE on paths: the service mounts the reads under `/v1/tracking`, so the path
+# is the same whether you hit tracking-service DIRECTLY (this file,
+# `:3005/v1/tracking/...`) or via the gateway (`/v1/tracking/...`) — the gateway
+# forwards `/v1` pass-through (it does not add or strip it). The WebSocket
+# (`/v1/tracking/socket.io/`) is exercised separately — see
+# docs/manual-testing-guide.md + the simulate-driver.ts script; a REST Client
+# file can't drive a Socket.IO connection.
 #
 # ─────────────────────────────────────────────────────────────────────────
 # THE BIG PICTURE: there is NO HTTP endpoint that starts tracking. An order
@@ -65,12 +66,12 @@ GET {{baseUrl}}/readyz
 ############################################################
 
 ### Latest known point for the order → 200 { orderId, lat, lng, ts } (404 if no point yet)
-# (Direct = no /v1; via the gateway this is GET /v1/tracking/orders/{id}/latest.)
-GET {{baseUrl}}/tracking/orders/{{orderId}}/latest
+# (Same path direct or via the gateway: GET /v1/tracking/orders/{id}/latest.)
+GET {{baseUrl}}/v1/tracking/orders/{{orderId}}/latest
 Authorization: Bearer {{token}}
 
 ### Full ordered route for the order → 200 { orderId, points: [{ lat, lng, ts }, ...] }
-GET {{baseUrl}}/tracking/orders/{{orderId}}/route
+GET {{baseUrl}}/v1/tracking/orders/{{orderId}}/route
 Authorization: Bearer {{token}}
 
 
@@ -79,16 +80,16 @@ Authorization: Bearer {{token}}
 ############################################################
 
 ### No auth — expect 401 unauthorized
-GET {{baseUrl}}/tracking/orders/{{orderId}}/latest
+GET {{baseUrl}}/v1/tracking/orders/{{orderId}}/latest
 
 ### Bogus JWT — expect 401 unauthorized
-GET {{baseUrl}}/tracking/orders/{{orderId}}/latest
+GET {{baseUrl}}/v1/tracking/orders/{{orderId}}/latest
 Authorization: Bearer not.a.real.jwt
 
 ### Read another customer's order (sub != the order's customerId, role customer) — expect 404 (existence hidden; same as an unknown order)
-GET {{baseUrl}}/tracking/orders/{{orderId}}/latest
+GET {{baseUrl}}/v1/tracking/orders/{{orderId}}/latest
 Authorization: Bearer <paste a DIFFERENT customer's JWT>
 
 ### Read a nonexistent / not-yet-tracked order (admin) — expect 404 not_found
-GET {{baseUrl}}/tracking/orders/06950000-0000-7000-8000-00000000ffff/latest
+GET {{baseUrl}}/v1/tracking/orders/06950000-0000-7000-8000-00000000ffff/latest
 Authorization: Bearer {{token}}
