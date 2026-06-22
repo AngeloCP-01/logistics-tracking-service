@@ -75,3 +75,5 @@ Unit tests use in-memory fakes; integration tests exercise the real wired app, W
 ## Architecture
 
 Clean Architecture: `src/{domain,application,infrastructure,interfaces,config}` + `server.ts` (composition root, attributed boot errors, SIGTERM graceful shutdown). Dependencies point inward; `infrastructure` implements the ports declared in `domain`/`application`. The `OrderTracking` aggregate owns the lifecycle state + authz predicates; Mongo / Redis / RabbitMQ / Socket.IO / HTTP are adapters behind ports. This is the platform's native-`mongodb` + WebSocket exception (every other V1 backend service is Prisma/Postgres HTTP).
+
+> Part of the [AI Logistics & Delivery Management Platform](https://github.com/AngeloCP-01/logistics-web#readme) — see the web repo for the full architecture overview.
